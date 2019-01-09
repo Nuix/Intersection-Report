@@ -9,5 +9,5 @@ $value_generators << ScriptedColumnValueGenerator.new("Highest Recipient Count")
 			highest = recipient_count
 		end
 	end
-	return highest
+	next highest
 end

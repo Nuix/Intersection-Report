@@ -18,6 +18,10 @@ class CategoryProviderBase
 		raise "You must override this method in the sub class"
 	end
 
+	def category_label
+		return label
+	end
+
 	def named_queries(scope_query)
 		raise "You must override this method in the sub class"
 	end

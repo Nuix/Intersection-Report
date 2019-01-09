@@ -61,12 +61,28 @@ value_generators_directory = File.join(script_directory,"ValueGenerators")
 Dir.glob(File.join(value_generators_directory,"**","*.rb")).each do |file|
 	load file
 end
-value_generator_choices = $value_generators.map{|vg| Choice.new(vg,vg.label)}
 
+# Generate a default report file path
+file_timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
+default_report_path = File.join($current_case.getLocation.getPath,"Reports","IntersectionReport_#{file_timestamp}.xlsx")
+default_report_path = default_report_path.gsub(/[\\\/]/,java.io.File.separator)
+
+# Define list of colors used by columns
+column_colors = [
+	{ :r => 139, :g => 222, :b => 62 },
+	{ :r => 0, :g => 233, :b => 183 },
+	{ :r => 0, :g => 230, :b => 255 },
+	{ :r => 36, :g => 197, :b => 255 },
+	{ :r => 163, :g => 150, :b => 255 },
+]
+
+# Build our settings dialog and settings tabs
 dialog = TabbedCustomDialog.new("Intersection Report")
 
 main_tab = dialog.addTab("main_tab","Main")
 main_tab.appendSaveFileChooser("report_file","Report File","Excel (*.xlsx)","xlsx")
+main_tab.setText("report_file",default_report_path)
+main_tab.doNotSerialize("report_file")
 
 # Generate a settings tab for each sheet we will allow the user to generate
 sheet_configuration_tab_count = 8
@@ -79,7 +95,10 @@ sheet_configuration_tab_count.times do |sheet_num|
 	sheet_tab.appendComboBox("#{sheet_num}_row_category","Row Category",category_providers_by_label.keys)
 	sheet_tab.appendComboBox("#{sheet_num}_col_category","Column Primary",category_providers_by_label.keys)
 	sheet_tab.appendHeader("Column Secondary")
-	sheet_tab.appendChoiceTable("#{sheet_num}_value_generators","",value_generator_choices)
+
+	# Each choice table needs its own set of the choices since the Choice object carries the checked state
+	# if we didn't do this then all the tables would reflect the same checked values
+	sheet_tab.appendChoiceTable("#{sheet_num}_value_generators","",$value_generators.map{|vg| Choice.new(vg,vg.label)})
 
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_sheet_name","#{sheet_num}_generate_sheet")
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_scope_query","#{sheet_num}_generate_sheet")
@@ -97,6 +116,7 @@ dialog.validateBeforeClosing do |values|
 	end
 
 	# Validate settings for each enabled sheet
+	all_sheets_valid = true
 	sheet_configuration_tab_count.times do |sheet_num|
 		sheet_num += 1
 
@@ -106,25 +126,29 @@ dialog.validateBeforeClosing do |values|
 		# Make sure user provided a sheet name
 		if values["#{sheet_num}_sheet_name"].strip.empty?
 			CommonDialogs.showWarning("Please provide a sheet name for sheet #{sheet_num}.")
-			next false
+			all_sheets_valid = false
+			break
 		end
 
 		# Make sure sheet name is at most 30 characters long
 		if values["#{sheet_num}_sheet_name"].size > 30
 			CommonDialogs.showWarning("Sheet #{sheet_num} name exceeds Excel limit of 30 characters.")
-			next false
+			all_sheets_valid = false
+			break
 		end
 
 		# Make sure at least 1 value generator is selected
 		if values["#{sheet_num}_value_generators"].size < 1
 			CommonDialogs.showWarning("Sheet #{sheet_num} has no secondary column types selected.  Please select at least 1.")
-			next false
+			all_sheets_valid = false
+			break
 		end
 
 		# A report where row and col category are the same doesn't make much sense, so lets prevent it
 		if values["#{sheet_num}_row_category"] == values["#{sheet_num}_col_category"]
 			CommonDialogs.showWarning("Sheet #{sheet_num} has same category for rows and columns.")
-			next false
+			all_sheets_valid = false
+			break
 		end
 
 		# Check scope query
@@ -134,9 +158,13 @@ dialog.validateBeforeClosing do |values|
 				$current_case.search(scope_query,{"limit" => 0})
 			rescue Exception => exc
 				CommonDialogs.showWarning("Scope query for sheet #{sheet_num} appears to be invalid: #{exc.message}")
-				next false
+				all_sheets_valid = false
+				break
 			end
 		end
+	end
+	if !all_sheets_valid
+		next false
 	end
 
 	next true
@@ -153,6 +181,13 @@ if dialog.getDialogResult == true
 	java.io.File.new(values["report_file"]).getParentFile.mkdirs
 	report = IntersectionReport.new(values["report_file"])
 
+	# Customize column primary category header colors
+	column_category_color_ring = report.getColCategoryColorRing
+	column_category_color_ring.clearColors
+	column_colors.each do |color|
+		column_category_color_ring.addColor(color[:r],color[:g],color[:b])
+	end
+
 	# Determine how many enabled sheets there are for the progress bar
 	total_enabled_sheets = 0
 	sheet_configuration_tab_count.times do |sheet_num|
@@ -163,7 +198,28 @@ if dialog.getDialogResult == true
 	enabled_sheet_index = 0
 
 	ProgressDialog.forBlock do |pd|
+
+		# Disable abort button
+		pd.setAbortButtonVisible(false)
+
+		# Make sure all messages logged to progress dialog also make their
+		# way to standard out / the main Nuix log
+		pd.onMessageLogged do |message|
+			puts message
+		end
+
+		# Initialize the state of the main progress bar and setup callback
+		# to update it when the report makes progress
 		pd.setMainProgress(0,total_enabled_sheets)
+		report.whenProgressUpdated do |current,total|
+			pd.setSubProgress(current,total)
+			pd.setSubStatus("#{current}/#{total}")
+		end
+
+		# Hook up forwarding log message from report generator to progress dialog
+		report.whenMessageGenerated do |message|
+			pd.logMessage("  #{message}")
+		end
 
 		# Iterate each possibly sheet configuration tab from the settings dialog
 		sheet_configuration_tab_count.times do |sheet_num|
@@ -172,28 +228,36 @@ if dialog.getDialogResult == true
 
 			# Skip if user did not enable this sheet
 			if values["#{sheet_num}_generate_sheet"] == false
-				pd.logMessage("Skipping disabled sheet #{sheet_num} '#{sheet_name}'")
+				# pd.logMessage("Skipping disabled sheet #{sheet_num} '#{sheet_name}'")
 				next
 			end
 
 			enabled_sheet_index += 1
 			pd.setMainProgress(enabled_sheet_index)
 			pd.setMainStatusAndLogIt("Configuring sheet #{sheet_num} '#{sheet_name}'")
+			pd.setSubProgress(0,1)
 
+			# Extract settings for this particular sheet
 			row_category = category_providers_by_label[values["#{sheet_num}_row_category"]]
 			col_category = category_providers_by_label[values["#{sheet_num}_col_category"]]
 			value_generators = values["#{sheet_num}_value_generators"]
 			scope_query = values["#{sheet_num}_scope_query"]
 
+			# Create a sheet configuration object and populat it with the appropriate
+			# settings from the settings dialog
 			sheet_config = IntersectionReportSheetConfiguration.new
+
 			# Row setup
-			sheet_config.setRowCategoryLabel(row_category.label)
+			sheet_config.setRowCategoryLabel(row_category.category_label)
 			sheet_config.setRowCriteria(row_category.named_queries(scope_query))
+			
 			# Primary column setup
-			sheet_config.setColPrimaryCategoryLabel(col_category.label)
+			sheet_config.setColPrimaryCategoryLabel(col_category.category_label)
 			sheet_config.setColCriteria(col_category.named_queries(scope_query))
+			
 			# Secondary column setup
 			sheet_config.setValueGenerators(value_generators)
+			
 			# Set scope query
 			sheet_config.setScopeQuery(scope_query)
 

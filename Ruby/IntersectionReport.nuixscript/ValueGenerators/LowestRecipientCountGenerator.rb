@@ -9,5 +9,5 @@ $value_generators << ScriptedColumnValueGenerator.new("Lowest Recipient Count") 
 			lowest = recipient_count
 		end
 	end
-	return lowest || 0
+	next lowest || 0
 end
