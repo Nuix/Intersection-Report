@@ -31,7 +31,11 @@ For the primary column categories, each term is also a query:
 - `access`
 - `circuit`
 
-To generate the values for the first "term" column the script first generates a Nuix query using the relevant row and column queries like so:
+Lets take a closer look at the first bit of the sheet.
+
+![image](https://user-images.githubusercontent.com/11775738/50988520-b639dd80-14c1-11e9-834e-8197d6709cca.png)
+
+To generate the values for the first term column the script first generates a Nuix query using the relevant row and column queries like so:
 
 `(kind:email) AND (hello)`
 
