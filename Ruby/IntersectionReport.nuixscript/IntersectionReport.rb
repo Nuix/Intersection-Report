@@ -1,3 +1,6 @@
+# Load Nx.jar and some useful classes from it.  This will enable use to
+# easily show a settings dialog and progress dialog.
+# Can be obtained on GitHub here: https://github.com/Nuix/Nx
 script_directory = File.dirname(__FILE__)
 require File.join(script_directory,"Nx.jar")
 java_import "com.nuix.nx.NuixConnection"
@@ -14,6 +17,9 @@ LookAndFeelHelper.setWindowsIfMetal
 NuixConnection.setUtilities($utilities)
 NuixConnection.setCurrentNuixVersion(NUIX_VERSION)
 
+# Load SuperUtilities.jar which contains all the classes needed to perform
+# the report generation.
+# Can be obtained on GitHub here: https://github.com/Nuix/SuperUtilities
 require File.join(script_directory,"SuperUtilities.jar")
 java_import com.nuix.superutilities.SuperUtilities
 java_import com.nuix.superutilities.reporting.IntersectionReport
@@ -50,7 +56,7 @@ Dir.glob(File.join(category_providers_directory,"**","*.rb")).each do |file|
 end
 
 # Gets an instance of each class that derives from CategoryProviderBase (all the category providers)
-category_providers = CategoryProviderBase.category_providers
+category_providers = CategoryProviderBase.category_providers.sort_by{|cp| cp.label}
 category_providers_by_label = {}
 category_providers.each{|cp| category_providers_by_label[cp.label] = cp}
 
@@ -61,6 +67,7 @@ value_generators_directory = File.join(script_directory,"ValueGenerators")
 Dir.glob(File.join(value_generators_directory,"**","*.rb")).each do |file|
 	load file
 end
+$value_generators = $value_generators.sort_by{|vg|vg.label}
 
 # Generate a default report file path
 file_timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
@@ -69,11 +76,19 @@ default_report_path = default_report_path.gsub(/[\\\/]/,java.io.File.separator)
 
 # Define list of colors used by columns
 column_colors = [
+	# Blue / green
 	{ :r => 139, :g => 222, :b => 62 },
 	{ :r => 0, :g => 233, :b => 183 },
 	{ :r => 0, :g => 230, :b => 255 },
 	{ :r => 36, :g => 197, :b => 255 },
 	{ :r => 163, :g => 150, :b => 255 },
+
+	# Yellow / red
+	{ :r => 176, :g => 179, :b => 37 },
+	{ :r => 213, :g => 154, :b => 20 },
+	{ :r => 242, :g => 123, :b => 48 },
+	{ :r => 255, :g => 89, :b => 85 },
+	{ :r => 255, :g => 61, :b => 129 },
 ]
 
 # Build our settings dialog and settings tabs
@@ -85,12 +100,13 @@ main_tab.setText("report_file",default_report_path)
 main_tab.doNotSerialize("report_file")
 
 # Generate a settings tab for each sheet we will allow the user to generate
-sheet_configuration_tab_count = 8
+sheet_configuration_tab_count = 16
 sheet_configuration_tab_count.times do |sheet_num|
 	sheet_num += 1
 	sheet_tab = dialog.addTab("sheet_#{sheet_num}_tab","Sheet #{sheet_num}")
 	sheet_tab.appendCheckBox("#{sheet_num}_generate_sheet","Generate this sheet",false)
 	sheet_tab.appendTextField("#{sheet_num}_sheet_name","Sheet Name","Sheet #{sheet_num}")
+	sheet_tab.appendCheckBox("#{sheet_num}_freeze_panes","Freeze Headers",true)
 	sheet_tab.appendTextArea("#{sheet_num}_scope_query","Scope Query","")
 	sheet_tab.appendComboBox("#{sheet_num}_row_category","Row Category",category_providers_by_label.keys)
 	sheet_tab.appendComboBox("#{sheet_num}_col_category","Column Primary",category_providers_by_label.keys)
@@ -101,11 +117,16 @@ sheet_configuration_tab_count.times do |sheet_num|
 	sheet_tab.appendChoiceTable("#{sheet_num}_value_generators","",$value_generators.map{|vg| Choice.new(vg,vg.label)})
 
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_sheet_name","#{sheet_num}_generate_sheet")
+	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_freeze_panes","#{sheet_num}_generate_sheet")
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_scope_query","#{sheet_num}_generate_sheet")
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_row_category","#{sheet_num}_generate_sheet")
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_col_category","#{sheet_num}_generate_sheet")
 	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_value_generators","#{sheet_num}_generate_sheet")
 end
+
+terms_tab = dialog.addTab("terms_tab","Provided Terms")
+terms_tab.appendLabel("terms_note","Terms to be used by 'Terms' category")
+terms_tab.appendStringList("terms_list")
 
 # Define how we are going to validate users settings
 dialog.validateBeforeClosing do |values|
@@ -162,7 +183,19 @@ dialog.validateBeforeClosing do |values|
 				break
 			end
 		end
+
+		# Make sure that if any category provider needs terms defined, user has provided some
+		terms = values["terms_list"]
+		row_category = category_providers_by_label[values["#{sheet_num}_row_category"]]
+		col_category = category_providers_by_label[values["#{sheet_num}_col_category"]]
+		if (row_category.needs_terms || col_category.needs_terms) && terms.size < 1
+			CommonDialogs.showWarning("Sheet #{sheet_num} is using a category which requires terms to be defined.  See 'Terms' tab.")
+			all_sheets_valid = false
+			break
+		end
 	end
+
+	puts "All Sheets Valid: #{all_sheets_valid}"
 	if !all_sheets_valid
 		next false
 	end
@@ -177,6 +210,8 @@ dialog.display
 if dialog.getDialogResult == true
 	# Map of settings dialog values
 	values = dialog.toMap
+
+	CategoryProviderBase.terms = values["terms_list"]
 
 	java.io.File.new(values["report_file"]).getParentFile.mkdirs
 	report = IntersectionReport.new(values["report_file"])
@@ -198,6 +233,7 @@ if dialog.getDialogResult == true
 	enabled_sheet_index = 0
 
 	ProgressDialog.forBlock do |pd|
+		pd.setTitle("Intersection Report")
 
 		# Disable abort button
 		pd.setAbortButtonVisible(false)
@@ -213,7 +249,7 @@ if dialog.getDialogResult == true
 		pd.setMainProgress(0,total_enabled_sheets)
 		report.whenProgressUpdated do |current,total|
 			pd.setSubProgress(current,total)
-			pd.setSubStatus("#{current}/#{total}")
+			pd.setSubStatus("Cell #{current}/#{total}")
 		end
 
 		# Hook up forwarding log message from report generator to progress dialog
@@ -261,9 +297,11 @@ if dialog.getDialogResult == true
 			# Set scope query
 			sheet_config.setScopeQuery(scope_query)
 
+			# Set whether 1st column and top 2 rows should be frozen (AKA freeze panes)
+			sheet_config.setFreezePanes(values["#{sheet_num}_freeze_panes"])
+
 			pd.setMainStatusAndLogIt("Generating sheet #{sheet_num} '#{sheet_name}'")
 			report.generate($current_case,sheet_name,sheet_config)
-			pd.logMessage("Completed generating sheet #{sheet_num} '#{sheet_name}'")
 		end
 
 		pd.setCompleted

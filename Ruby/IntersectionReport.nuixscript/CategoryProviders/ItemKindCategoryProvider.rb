@@ -1,5 +1,9 @@
 class ItemKindCategoryProvider < CategoryProviderBase
 	def label
+		return "Item Kind (All)"
+	end
+
+	def category_label
 		return "Item Kind"
 	end
 

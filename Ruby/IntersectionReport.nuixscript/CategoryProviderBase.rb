@@ -14,6 +14,15 @@ Additionally methods can_be_row and can_be_column can return false to only prese
 category provider as an option for use by rows or columns.
 =end
 class CategoryProviderBase
+	@@terms = []
+	def self.terms
+		return @@terms
+	end
+
+	def self.terms=(value)
+		@@terms = value
+	end
+
 	def label
 		raise "You must override this method in the sub class"
 	end
@@ -32,6 +41,10 @@ class CategoryProviderBase
 
 	def can_be_column
 		return true
+	end
+
+	def needs_terms
+		return false
 	end
 
 	def self.category_providers

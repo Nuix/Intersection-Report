@@ -1,4 +1,4 @@
-class HasProductionSetCategoryProvider < CategoryProviderBase
+class ProductionSetStatusCategoryProvider < CategoryProviderBase
 	def label
 		return "Production Set Status"
 	end
