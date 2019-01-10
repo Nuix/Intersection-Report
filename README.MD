@@ -1,15 +1,59 @@
-[PROJECT_NAME]
-==============
+Intersection Report
+===================
 
-![Last tested in Nuix 7.4](https://img.shields.io/badge/Nuix-7.4-green.svg)
+![Last tested in Nuix 7.6](https://img.shields.io/badge/Nuix-7.6-green.svg)
 
-View the GitHub project [here](LINK_TO_PROJECT) or download the latest release [here](LINK_TO_PROJECT_RELEASES).
+View the GitHub project [here](https://github.com/Nuix/Intersection-Report) or download the latest release [here](https://github.com/Nuix/Intersection-Report/releases).
 
 # Overview
 
-**Written By:** [YOUR_NAME]
+**Written By:** Jason Wells
 
-[PROJECT_DESCRIPTION]
+This script generates Excel spreadsheet reports where cell values are based on the intersection of a given cell's row category and column category.  Nested withing a given column category is a series of sub-columns which report various values about the items corresponding to the row and column categories.  This may be best explained with and example.
+
+![image](https://user-images.githubusercontent.com/11775738/50987968-e54f4f80-14bf-11e9-83f7-fe5c7976509d.png)
+
+The image above is a sheet from a sample report.  For this sheet I have selected a row category of "Item Kind" and a column category that is a short list of search terms I provided.  I have also selected the following value generators (the sub columns):
+- Item Count
+- Immaterial Count
+- Audited Size
+- Earliest Date
+- Latest Date
+
+So for the item kind category, internally a series of Nuix queries is provided:
+- `kind:email`
+- `kind:document`
+- `kind:spreadsheet`
+- etc.
+
+For the primary column categories, each term is also a query:
+- `hello`
+- `access`
+- `circuit`
+
+To generate the values for the first "term" column the script first generates a Nuix query using the relevant row and column queries like so:
+
+`(kind:email) AND (hello)`
+
+This query is then provided in turn to each value generator, which then decides how to use this query to resolve its value.  For example [Item Count](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/ItemCountGenerator.rb) simply determines how many items are responsive the the AND'ed query:
+
+```ruby
+return $current_case.count("(kind:email) AND (hello)")
+```
+
+While a more complex value generator such as [Earliest Date](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/EarliestDateGenerator.rb) runs a search to obtain the underlying items and performs some analysis to determine within the collection of items what the ealiest date is:
+
+```ruby
+modified_query = "(#{query}) AND has-exclusion:0"
+items = nuix_case.search(modified_query)
+if items.size > 0
+	items = items.reject{|item| item.getDate.nil?}
+	items = items.sort_by{|item| item.getDate.getMillis}
+	next items.first.getDate.toString("YYYY/MM/dd")
+else
+	next ""
+end
+```
 
 # Getting Started
 
@@ -20,15 +64,19 @@ Begin by downloading the latest release of this code.  Extract the contents of t
 - `%appdata%\Nuix\Scripts` - User level script directory
 - `%programdata%\Nuix\Scripts` - System level script directory
 
-[PROJECT_USAGE_SECTIONS]
-
 ## Cloning this Repository
 
 This script relies on code from [Nx](https://github.com/Nuix/Nx) to present a settings dialog and progress dialog.  This JAR file is not included in the repository (although it is included in release downloads).  If you clone this repository, you will also want to obtain a copy of Nx.jar by either:
 1. Building it from [the source](https://github.com/Nuix/Nx)
 2. Downloading an already built JAR file from the [Nx releases](https://github.com/Nuix/Nx/releases)
 
-Once you have a copy of Nx.jar, make sure to include it in the same directory as the script.
+Once you have a copy of Nx.jar, make sure to include it in the same directory as the scripts.
+
+This script also relies on code from [SuperUtilities](https://github.com/Nuix/SuperUtilities), which contains the code to do the report generation.  This JAR file is not included in the repository (although it is included in release downloads).  If you clone this repository, you will also want to obtain a copy of SuperUtilities.jar by either:
+1. Building it from [the source](https://github.com/Nuix/SuperUtilities)
+2. Downloading an already built JAR file from the [Nx releases](https://github.com/Nuix/SuperUtilities/releases)
+
+Once you also have a copy of SuperUtilities.jar, make sure to include it in the same directory as the scripts.
 
 # License
 
