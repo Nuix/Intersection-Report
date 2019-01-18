@@ -74,22 +74,16 @@ file_timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
 default_report_path = File.join($current_case.getLocation.getPath,"Reports","IntersectionReport_#{file_timestamp}.xlsx")
 default_report_path = default_report_path.gsub(/[\\\/]/,java.io.File.separator)
 
-# Define list of colors used by columns
-column_colors = [
-	# Blue / green
-	{ :r => 139, :g => 222, :b => 62 },
-	{ :r => 0, :g => 233, :b => 183 },
-	{ :r => 0, :g => 230, :b => 255 },
-	{ :r => 36, :g => 197, :b => 255 },
-	{ :r => 163, :g => 150, :b => 255 },
-
-	# Yellow / red
-	{ :r => 176, :g => 179, :b => 37 },
-	{ :r => 213, :g => 154, :b => 20 },
-	{ :r => 242, :g => 123, :b => 48 },
-	{ :r => 255, :g => 89, :b => 85 },
-	{ :r => 255, :g => 61, :b => 129 },
-]
+# Load column colors from file
+puts "Loading column colors..."
+column_colors = []
+column_colors_file = File.join(script_directory,"ColumnColors.txt")
+File.foreach(column_colors_file) do |line|
+	if !line.strip.empty? && line !~ /^#/
+		c = line.strip.split(",").map{|c|c.strip.to_i}
+		column_colors << { :r => c[0], :g => c[1], :b => c[2] }
+	end
+end
 
 # Build our settings dialog and settings tabs
 dialog = TabbedCustomDialog.new("Intersection Report")

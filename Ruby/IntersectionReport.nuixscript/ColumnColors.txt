@@ -1,0 +1,17 @@
+# Each line defines a color to be used by column category headers
+# Each line is an RGB triple
+# Each color channel value may only be 0-255
+
+# Blue / green
+139,222,62
+0,233,183
+0,230,255
+36,197,255
+163,150,255
+
+# Yellow / red
+176,179,37
+213,154,20
+242,123,48
+255,89,85
+255,61,129
