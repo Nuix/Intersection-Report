@@ -1,10 +1,13 @@
 $value_generators << ScriptedColumnValueGenerator.new("Latest Date") do |nuix_case,query|
+	java_import org.joda.time.DateTimeZone
+	investigation_time_zone = DateTimeZone.forID(nuix_case.getInvestigationTimeZone)
+
 	modified_query = "(#{query}) AND has-exclusion:0"
 	items = nuix_case.search(modified_query)
+	items = items.reject{|item| item.getDate.nil?}
 	if items.size > 0
-		items = items.reject{|item| item.getDate.nil?}
 		items = items.sort_by{|item| item.getDate.getMillis}
-		next items.last.getDate.toString("YYYY/MM/dd")
+		next items.last.getDate.withZone(investigation_time_zone).toString("YYYY/MM/dd")
 	else
 		next ""
 	end

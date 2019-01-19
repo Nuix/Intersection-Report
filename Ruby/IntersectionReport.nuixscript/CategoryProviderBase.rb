@@ -23,6 +23,15 @@ class CategoryProviderBase
 		@@terms = value
 	end
 
+	@@noise_terms = {}
+	def self.noise_terms
+		return @@noise_terms
+	end
+
+	def self.noise_terms=(value)
+		@@noise_terms = value
+	end
+
 	def label
 		raise "You must override this method in the sub class"
 	end

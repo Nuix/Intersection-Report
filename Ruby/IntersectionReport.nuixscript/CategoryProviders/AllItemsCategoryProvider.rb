@@ -8,6 +8,6 @@ class AllItemsCategoryProvider < CategoryProviderBase
 	end
 
 	def named_queries(scope_query)
-		return [NamedQuery.new("Overall","*:*")]
+		return [NamedQuery.new("Overall","")]
 	end
 end
