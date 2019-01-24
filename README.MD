@@ -39,25 +39,37 @@ To generate the values for the first term column the script first generates a Nu
 
 `(kind:email) AND (hello)`
 
-This query is then provided in turn to each value generator, which then decides how to use this query to resolve its value.  For example [Item Count](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/ItemCountGenerator.rb) simply determines how many items are responsive the the AND'ed query:
+This query is then provided in turn to each value generator, which then decides how to use this query to resolve its value.  For example [Item Count](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/ItemCountGenerator.rb) simply determines how many items are responsive to the AND'ed query:
 
 ```ruby
-return $current_case.count("(kind:email) AND (hello)")
-```
-
-While a more complex value generator such as [Earliest Date](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/EarliestDateGenerator.rb) runs a search to obtain the underlying items and performs some analysis to determine within the collection of items what the ealiest date is:
-
-```ruby
-modified_query = "(#{query}) AND has-exclusion:0"
-items = nuix_case.search(modified_query)
-if items.size > 0
-	items = items.reject{|item| item.getDate.nil?}
-	items = items.sort_by{|item| item.getDate.getMillis}
-	next items.first.getDate.toString("YYYY/MM/dd")
-else
-	next ""
+$value_generators << ScriptedColumnValueGenerator.new("Item Count") do |nuix_case,query|
+	modified_query = "(#{query}) AND has-exclusion:0"
+	next nuix_case.count(modified_query)
 end
 ```
+
+While a more complex value generator such as [Earliest Date](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/EarliestDateGenerator.rb) runs a search to obtain the responsive items and performs some analysis to determine within that collection of items what the ealiest date is:
+
+```ruby
+$value_generators << ScriptedColumnValueGenerator.new("Earliest Date") do |nuix_case,query|
+	java_import org.joda.time.DateTimeZone
+	investigation_time_zone = DateTimeZone.forID(nuix_case.getInvestigationTimeZone)
+
+	modified_query = "(#{query}) AND has-exclusion:0"
+	items = nuix_case.search(modified_query)
+	items = items.reject{|item| item.getDate.nil?}
+	if items.size > 0
+		items = items.sort_by{|item| item.getDate.getMillis}
+		next items.first.getDate.withZone(investigation_time_zone).toString("YYYY/MM/dd")
+	else
+		next ""
+	end
+end
+```
+
+Head on over to the [Wiki](https://github.com/Nuix/Intersection-Report/wiki) to learn more about category providers and value generators.
+
+The core implementation of the report can be found over in the [SuperUtilities](https://github.com/Nuix/SuperUtilities) repository in the namespace [com.nuix.superutilities.reporting](https://github.com/Nuix/SuperUtilities/tree/master/Java/src/main/java/com/nuix/superutilities/reporting).  This script provides the interface and specific reporting details implementation (category providers and column generators).
 
 # Getting Started
 
