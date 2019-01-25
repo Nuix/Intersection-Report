@@ -9,11 +9,11 @@ View the GitHub project [here](https://github.com/Nuix/Intersection-Report) or d
 
 **Written By:** Jason Wells
 
-This script generates Excel spreadsheet reports where cell values are based on the intersection of a given cell's row category and column category.  Nested withing a given column category is a series of sub-columns which report various values about the items corresponding to the row and column categories.  This may be best explained with and example.
+This script generates Excel spreadsheet reports where cell values are based on the intersection of a given cell's row category and column category.  Nested within a given column category is a series of sub-columns which report various values about the items corresponding to the row and column categories.  This may be best explained with an example.
 
 ![image](https://user-images.githubusercontent.com/11775738/50987968-e54f4f80-14bf-11e9-83f7-fe5c7976509d.png)
 
-The image above is a sheet from a sample report.  For this sheet I have selected a row category of "Item Kind" and a column category that is a short list of search terms I provided.  I have also selected the following value generators (the sub columns):
+The image above is a sheet from a sample report.  For this sheet I have selected a row category of "Item Kind" and a column category that is a short list of search terms I provided.  I have also selected the following value generators (the sub-columns):
 - Item Count
 - Immaterial Count
 - Audited Size
@@ -39,7 +39,7 @@ To generate the values for the first term column the script first generates a Nu
 
 `(kind:email) AND (hello)`
 
-This query is then provided in turn to each value generator, which then decides how to use this query to resolve its value.  For example [Item Count](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/ItemCountGenerator.rb) simply determines how many items are responsive to the AND'ed query:
+This query is then provided in turn to each value generator, which then decides how to use this query to resolve its value.  For example [Item Count](https://github.com/Nuix/Intersection-Report/blob/master/Ruby/IntersectionReport.nuixscript/ValueGenerators/ItemCountGenerator.rb) determines how many items are responsive to the AND'ed query (`has-exclusion:0` is added in to remove excluded items):
 
 ```ruby
 $value_generators << ScriptedColumnValueGenerator.new("Item Count") do |nuix_case,query|
@@ -69,7 +69,7 @@ end
 
 Head on over to the [Wiki](https://github.com/Nuix/Intersection-Report/wiki) to learn more about category providers and value generators.
 
-The core implementation of the report can be found over in the [SuperUtilities](https://github.com/Nuix/SuperUtilities) repository in the namespace [com.nuix.superutilities.reporting](https://github.com/Nuix/SuperUtilities/tree/master/Java/src/main/java/com/nuix/superutilities/reporting).  This script provides the interface and specific reporting details implementation (category providers and column generators).
+The core implementation of the report can be found over in the [SuperUtilities](https://github.com/Nuix/SuperUtilities) repository in the namespace [com.nuix.superutilities.reporting](https://github.com/Nuix/SuperUtilities/tree/master/Java/src/main/java/com/nuix/superutilities/reporting).  This script provides the graphical user iterface (settings dialog and progress dialog) and the specific reporting implementation (category providers and column generators).
 
 # Getting Started
 
