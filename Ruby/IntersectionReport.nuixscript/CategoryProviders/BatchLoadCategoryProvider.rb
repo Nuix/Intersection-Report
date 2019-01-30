@@ -7,7 +7,10 @@ class BatchLoadCategoryProvider < CategoryProviderBase
 		batch_loads = $current_case.getBatchLoads
 		result = []
 		batch_loads.each do |batch_load|
-			result << batch_load.getLoaded.toString("YYYY/MM/dd HH:mm")
+			name = batch_load.getLoaded.toString("YYYY/MM/dd HH:mm")
+			batch_id = batch_load.getBatchId
+			query = "batch-load-guid:#{batch_id}"
+			result << NamedQuery.new(name,query)
 		end
 		return result
 	end
