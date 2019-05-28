@@ -1,4 +1,4 @@
-class ItemKindWithinScopeCategoryProvider < CategoryProviderBase
+class ItemKindWithinScopeWithSummaryCategoryProvider < CategoryProviderBase
 	def label
 		return "Item Kind (Within Scope, With Summary)"
 	end
