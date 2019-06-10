@@ -235,8 +235,9 @@ if dialog.getDialogResult == true
 
 	CategoryProviderBase.terms = values["terms_list"]
 
-	java.io.File.new(values["report_file"]).getParentFile.mkdirs
-	report = IntersectionReport.new(values["report_file"])
+	report_file = values["report_file"]
+	java.io.File.new(report_file).getParentFile.mkdirs
+	report = IntersectionReport.new(report_file)
 
 	# Customize column primary category header colors
 	column_category_color_ring = report.getColCategoryColorRing
@@ -278,6 +279,8 @@ if dialog.getDialogResult == true
 		report.whenMessageGenerated do |message|
 			pd.logMessage("  #{message}")
 		end
+
+		pd.logMessage("Report File: #{report_file}")
 
 		# Iterate each possibly sheet configuration tab from the settings dialog
 		sheet_configuration_tab_count.times do |sheet_num|
