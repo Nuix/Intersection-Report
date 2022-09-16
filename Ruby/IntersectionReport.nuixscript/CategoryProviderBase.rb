@@ -23,6 +23,25 @@ class CategoryProviderBase
 		@@terms = value
 	end
 
+	@@search_content_for_terms = true
+	@@search_properties_for_terms = true
+
+	def self.search_content_for_terms
+		return @@search_content_for_terms
+	end
+
+	def self.search_content_for_terms=(value)
+		@@search_content_for_terms = value
+	end
+
+	def self.search_properties_for_terms
+		return @@search_properties_for_terms
+	end
+
+	def self.search_properties_for_terms=(value)
+		@@search_properties_for_terms = value
+	end
+
 	@@noise_terms = {}
 	def self.noise_terms
 		return @@noise_terms
