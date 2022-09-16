@@ -31,6 +31,9 @@ java_import com.nuix.superutilities.reporting.ScriptedColumnValueGenerator
 java_import com.nuix.superutilities.misc.FormatUtility
 $su = SuperUtilities.init($utilities,NUIX_VERSION)
 
+# User can filter by date time so we need to import it
+java_import org.joda.time.DateTime
+
 # If $current_case is nil, then we are likely running from nuix_console executable and will need
 # to own the case life cycle ourselves
 default_case_directory = "C:\\"
@@ -121,6 +124,9 @@ category_providers_by_label.each do |label,cat|
 	end
 end
 
+month_start = DateTime.new.dayOfMonth.withMinimumValue
+month_end = DateTime.new.dayOfMonth.withMaximumValue
+
 # Generate a settings tab for each sheet we will allow the user to generate
 sheet_configuration_tab_count = 16
 sheet_configuration_tab_count.times do |sheet_num|
@@ -130,6 +136,18 @@ sheet_configuration_tab_count.times do |sheet_num|
 	sheet_tab.appendTextField("#{sheet_num}_sheet_name","Sheet Name","Sheet #{sheet_num}")
 	sheet_tab.appendCheckBox("#{sheet_num}_freeze_panes","Freeze Headers",true)
 	sheet_tab.appendTextArea("#{sheet_num}_scope_query","Scope Query","")
+	
+	sheet_tab.appendCheckBox("#{sheet_num}_date_range_filter_batches","Only Items in Batch Loads in Date Range",false)
+	sheet_tab.appendDatePicker("#{sheet_num}_batch_load_min_date","Batch Load Date Min",month_start)
+	sheet_tab.appendDatePicker("#{sheet_num}_batch_load_max_date","Batch Load Date Max",month_end)
+	sheet_tab.appendButton("#{sheet_num}_set_range_month","Set Range to This Month") do
+		sheet_tab.setDate("#{sheet_num}_batch_load_min_date",month_start)
+		sheet_tab.setDate("#{sheet_num}_batch_load_max_date",month_end)
+	end
+	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_batch_load_min_date","#{sheet_num}_date_range_filter_batches")
+	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_batch_load_max_date","#{sheet_num}_date_range_filter_batches")
+	sheet_tab.enabledOnlyWhenChecked("#{sheet_num}_set_range_month","#{sheet_num}_date_range_filter_batches")
+
 	sheet_tab.appendComboBox("#{sheet_num}_row_category","Row Category",row_category_names)
 	sheet_tab.appendComboBox("#{sheet_num}_col_category","Column Primary",col_category_names)
 	sheet_tab.appendHeader("Column Secondary")
@@ -204,6 +222,11 @@ dialog.validateBeforeClosing do |values|
 				all_sheets_valid = false
 				break
 			end
+		end
+
+		if values["#{sheet_num}_date_range_filter_batches"] && values["#{sheet_num}_batch_load_max_date"].isBefore(values["#{sheet_num}_batch_load_min_date"])
+			CommonDialogs.showWarning("Invalid batch load date range on sheet #{sheet_num}.  Max date cannot be before min date.")
+			next false
 		end
 
 		# Make sure that if any category provider needs terms defined, user has provided some
@@ -321,6 +344,23 @@ if dialog.getDialogResult == true
 			
 			# Set scope query
 			sheet_config.setScopeQuery(scope_query)
+
+			# If we are filtering on batch load dates, then provide them
+			if "#{sheet_num}_date_range_filter_batches"
+				
+				min_bl_date = values["#{sheet_num}_batch_load_min_date"]
+				if !min_bl_date.nil?
+					min_bl_date = DateTime.new(min_bl_date).millisOfDay.withMinimumValue
+				end
+				
+				max_bl_date = values["#{sheet_num}_batch_load_max_date"]
+				if !max_bl_date.nil?
+					max_bl_date = DateTime.new(max_bl_date).millisOfDay.withMaximumValue
+				end
+
+				sheet_config.setBatchLoadMinDate(min_bl_date)
+				sheet_config.setBatchLoadMaxDate(max_bl_date)
+			end
 
 			# Set whether 1st column and top 2 rows should be frozen (AKA freeze panes)
 			sheet_config.setFreezePanes(values["#{sheet_num}_freeze_panes"])
