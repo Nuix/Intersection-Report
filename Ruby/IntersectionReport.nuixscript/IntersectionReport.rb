@@ -224,9 +224,34 @@ dialog.validateBeforeClosing do |values|
 			end
 		end
 
-		if values["#{sheet_num}_date_range_filter_batches"] && values["#{sheet_num}_batch_load_max_date"].isBefore(values["#{sheet_num}_batch_load_min_date"])
-			CommonDialogs.showWarning("Invalid batch load date range on sheet #{sheet_num}.  Max date cannot be before min date.")
-			next false
+		if values["#{sheet_num}_date_range_filter_batches"]
+			min_bl_date = values["#{sheet_num}_batch_load_min_date"]
+			if !min_bl_date.nil?
+				min_bl_date = DateTime.new(min_bl_date).millisOfDay.withMinimumValue
+			end
+			
+			max_bl_date = values["#{sheet_num}_batch_load_max_date"]
+			if !max_bl_date.nil?
+				max_bl_date = DateTime.new(max_bl_date).millisOfDay.withMaximumValue
+			end
+
+			# Make sure that min is less that max
+			if max_bl_date.isBefore(min_bl_date)
+				CommonDialogs.showWarning("Invalid batch load date range on sheet #{sheet_num}.  Max date cannot be before min date.")
+				all_sheets_valid = false
+				break
+			end
+
+			# Validate that date range provided by user will actually result in at least 1 batch load.  The report will not error or warn
+			# when no batch loads match.  Report will instead use a scope query that will result in all zeros in the report, since technically
+			# that is valid.  So we will warn about this here instead.
+			in_range_guids = IntersectionReport.findBatchLoadsInDateRange($current_case,min_bl_date,max_bl_date)
+			if in_range_guids.size < 1
+				CommonDialogs.showWarning("No batch loads were loaded within the date range specified on sheet #{sheet_num}, "+
+					"please revise or disable batch load date filtering for this sheet.")
+				all_sheets_valid = false
+				break
+			end
 		end
 
 		# Make sure that if any category provider needs terms defined, user has provided some
